@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Plus, Building, Calendar, Users } from 'lucide-react';
 import PropertyForm from '../components/PropertyForm';
@@ -25,7 +24,6 @@ const LandlordDashboard: React.FC = () => {
       if (!currentUser) return;
 
       try {
-        // Fetch properties count
         const propertiesQuery = query(
           collection(db, 'properties'),
           where('ownerId', '==', currentUser.uid)
@@ -33,16 +31,24 @@ const LandlordDashboard: React.FC = () => {
         const propertiesSnapshot = await getDocs(propertiesQuery);
         const totalProperties = propertiesSnapshot.size;
 
-        // Fetch bookings for all properties
         const propertyIds = propertiesSnapshot.docs.map(doc => doc.id);
         let totalBookings = 0;
         let pendingBookings = 0;
 
         if (propertyIds.length > 0) {
-          const bookingsQuery = query(
-            collection(db, 'bookings'),
-            where('propertyId', 'in', propertyIds)
-          );
+          let bookingsQuery;
+          if (propertyIds.length === 1) {
+            bookingsQuery = query(
+              collection(db, 'bookings'),
+              where('propertyId', '==', propertyIds[0])
+            );
+          } else {
+            bookingsQuery = query(
+              collection(db, 'bookings'),
+              where('propertyId', 'in', propertyIds)
+            );
+          }
+
           const bookingsSnapshot = await getDocs(bookingsQuery);
           totalBookings = bookingsSnapshot.size;
           pendingBookings = bookingsSnapshot.docs.filter(
@@ -88,7 +94,6 @@ const LandlordDashboard: React.FC = () => {
           </Button>
         </div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardContent className="p-6">
@@ -127,7 +132,6 @@ const LandlordDashboard: React.FC = () => {
           </Card>
         </div>
 
-        {/* Tabs */}
         <Tabs defaultValue="properties" className="space-y-6">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="properties">إدارة العقارات</TabsTrigger>
@@ -143,13 +147,12 @@ const LandlordDashboard: React.FC = () => {
           </TabsContent>
         </Tabs>
 
-        {/* Property Form Modal */}
         {showPropertyForm && (
           <PropertyForm
             onClose={() => setShowPropertyForm(false)}
             onSuccess={() => {
               setShowPropertyForm(false);
-              window.location.reload(); // Refresh to update stats
+              window.location.reload();
             }}
           />
         )}
