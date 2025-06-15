@@ -1,17 +1,18 @@
+// src/lib/firebase.ts
 
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-// Firebase configuration - Replace with your actual config
+// Firebase configuration - real config from your Firebase project
 const firebaseConfig = {
-  apiKey: "your-api-key-here",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "your-app-id"
+  apiKey: "AIzaSyD8ajizcba8hH63jCVqPvro-evYpoo5SC8",
+  authDomain: "arab-syr.firebaseapp.com",
+  projectId: "arab-syr",
+  storageBucket: "arab-syr.firebasestorage.app",
+  messagingSenderId: "739945251083",
+  appId: "1:739945251083:web:74d07bd93aebf07777220e"
 };
 
 // Initialize Firebase
