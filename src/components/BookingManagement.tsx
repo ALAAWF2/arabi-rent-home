@@ -53,41 +53,56 @@ const BookingManagement: React.FC = () => {
         return;
       }
 
-      // Get all bookings for these properties
-      const bookingsQuery = query(
-        collection(db, 'bookings'),
-        where('propertyId', 'in', propertyIds)
-      );
-      const bookingsSnapshot = await getDocs(bookingsQuery);
+      let allBookings: Booking[] = [];
+      for (let i = 0; i < propertyIds.length; i += 10) {
+        const chunk = propertyIds.slice(i, i + 10);
+        let bookingsQuery;
+        if (chunk.length === 1) {
+          bookingsQuery = query(
+            collection(db, 'bookings'),
+            where('propertyId', '==', chunk[0])
+          );
+        } else {
+          bookingsQuery = query(
+            collection(db, 'bookings'),
+            where('propertyId', 'in', chunk)
+          );
+        }
 
-      const bookingsData = await Promise.all(
-        bookingsSnapshot.docs.map(async (bookingDoc) => {
-          const bookingData = bookingDoc.data();
-          
-          // Get renter name
-          const renterDoc = await getDoc(doc(db, 'users', bookingData.renterId));
-          const renterName = renterDoc.exists() ? renterDoc.data().name : 'غير معروف';
+        const bookingsSnapshot = await getDocs(bookingsQuery);
 
-          // Get property rental amount
-          const propertyDoc = await getDoc(doc(db, 'properties', bookingData.propertyId));
-          const rentalAmount = propertyDoc.exists() ? propertyDoc.data().price : 0;
+        const bookingsData = await Promise.all(
+          bookingsSnapshot.docs.map(async (bookingDoc) => {
+            const bookingData = bookingDoc.data();
 
-          return {
-            id: bookingDoc.id,
-            ...bookingData,
-            startDate: bookingData.startDate.toDate(),
-            endDate: bookingData.endDate.toDate(),
-            timestamp: bookingData.timestamp.toDate(),
-            renterName,
-            propertyTitle: propertiesMap.get(bookingData.propertyId) || 'عقار غير معروف',
-            rentalAmount
-          } as Booking;
-        })
-      );
+            // Get renter name
+            const renterDoc = await getDoc(doc(db, 'users', bookingData.renterId));
+            const renterName = renterDoc.exists() ? renterDoc.data().name : 'غير معروف';
+
+            // Get property rental amount
+            const propertyDoc = await getDoc(doc(db, 'properties', bookingData.propertyId));
+            const propertyData = propertyDoc.exists() ? propertyDoc.data() : null;
+            const rentalAmount = propertyData?.pricePerMonth || 0;
+
+            return {
+              id: bookingDoc.id,
+              ...bookingData,
+              startDate: bookingData.startDate.toDate(),
+              endDate: bookingData.endDate.toDate(),
+              timestamp: bookingData.timestamp.toDate(),
+              renterName,
+              propertyTitle: propertiesMap.get(bookingData.propertyId) || 'عقار غير معروف',
+              rentalAmount
+            } as Booking;
+          })
+        );
+
+        allBookings = allBookings.concat(bookingsData);
+      }
 
       // Sort by timestamp (newest first)
-      bookingsData.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-      setBookings(bookingsData);
+      allBookings.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      setBookings(allBookings);
     } catch (error) {
       console.error('Error fetching bookings:', error);
     } finally {
