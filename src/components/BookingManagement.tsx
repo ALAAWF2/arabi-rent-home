@@ -14,6 +14,7 @@ import { Calendar, User, MapPin, MessageCircle, AlertTriangle, Wallet } from 'lu
 interface Booking {
   id: string;
   renterId: string;
+  ownerId: string;
   propertyId: string;
   startDate: Date;
   endDate: Date;
@@ -37,40 +38,26 @@ const BookingManagement: React.FC = () => {
     if (!currentUser) return;
 
     try {
-      // First, get all properties owned by current user
-      const propertiesQuery = query(
-        collection(db, 'properties'),
-        where('ownerId', '==', currentUser.uid)
-      );
-      const propertiesSnapshot = await getDocs(propertiesQuery);
-      const propertyIds = propertiesSnapshot.docs.map(doc => doc.id);
-      const propertiesMap = new Map(
-        propertiesSnapshot.docs.map(doc => [doc.id, doc.data().title])
-      );
-
-      if (propertyIds.length === 0) {
-        setLoading(false);
-        return;
-      }
-
-      // Get all bookings for these properties
+      // Get all bookings owned by current user
       const bookingsQuery = query(
         collection(db, 'bookings'),
-        where('propertyId', 'in', propertyIds)
+        where('ownerId', '==', currentUser.uid)
       );
       const bookingsSnapshot = await getDocs(bookingsQuery);
 
       const bookingsData = await Promise.all(
         bookingsSnapshot.docs.map(async (bookingDoc) => {
           const bookingData = bookingDoc.data();
-          
+
           // Get renter name
           const renterDoc = await getDoc(doc(db, 'users', bookingData.renterId));
           const renterName = renterDoc.exists() ? renterDoc.data().name : 'غير معروف';
 
           // Get property rental amount
           const propertyDoc = await getDoc(doc(db, 'properties', bookingData.propertyId));
-          const rentalAmount = propertyDoc.exists() ? propertyDoc.data().price : 0;
+          const propertyData = propertyDoc.exists() ? propertyDoc.data() : null;
+          const propertyTitle = propertyData?.title || 'عقار غير معروف';
+          const rentalAmount = propertyData?.pricePerMonth || 0;
 
           return {
             id: bookingDoc.id,
@@ -79,7 +66,7 @@ const BookingManagement: React.FC = () => {
             endDate: bookingData.endDate.toDate(),
             timestamp: bookingData.timestamp.toDate(),
             renterName,
-            propertyTitle: propertiesMap.get(bookingData.propertyId) || 'عقار غير معروف',
+            propertyTitle,
             rentalAmount
           } as Booking;
         })

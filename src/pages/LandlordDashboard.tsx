@@ -37,30 +37,15 @@ const LandlordDashboard: React.FC = () => {
         const propertiesSnapshot = await getDocs(propertiesQuery);
         const totalProperties = propertiesSnapshot.size;
 
-        const propertyIds = propertiesSnapshot.docs.map(doc => doc.id);
-        let totalBookings = 0;
-        let pendingBookings = 0;
-
-        if (propertyIds.length > 0) {
-          let bookingsQuery;
-          if (propertyIds.length === 1) {
-            bookingsQuery = query(
-              collection(db, 'bookings'),
-              where('propertyId', '==', propertyIds[0])
-            );
-          } else {
-            bookingsQuery = query(
-              collection(db, 'bookings'),
-              where('propertyId', 'in', propertyIds)
-            );
-          }
-
-          const bookingsSnapshot = await getDocs(bookingsQuery);
-          totalBookings = bookingsSnapshot.size;
-          pendingBookings = bookingsSnapshot.docs.filter(
-            doc => doc.data().status === 'pending'
-          ).length;
-        }
+        const bookingsQuery = query(
+          collection(db, 'bookings'),
+          where('ownerId', '==', currentUser.uid)
+        );
+        const bookingsSnapshot = await getDocs(bookingsQuery);
+        const totalBookings = bookingsSnapshot.size;
+        const pendingBookings = bookingsSnapshot.docs.filter(
+          doc => doc.data().status === 'pending'
+        ).length;
 
         setStats({ totalProperties, totalBookings, pendingBookings });
       } catch (error) {

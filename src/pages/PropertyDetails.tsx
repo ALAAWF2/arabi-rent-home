@@ -102,8 +102,11 @@ const PropertyDetails: React.FC = () => {
     setSubmitting(true);
 
     try {
+      if (!property) return;
+
       await addDoc(collection(db, 'bookings'), {
         renterId: currentUser.uid,
+        ownerId: property.ownerId,
         propertyId: id,
         startDate: new Date(bookingData.startDate),
         endDate: new Date(bookingData.endDate),

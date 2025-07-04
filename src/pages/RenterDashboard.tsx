@@ -15,6 +15,7 @@ interface Booking {
   message: string;
   status: 'pending' | 'accepted' | 'rejected';
   timestamp: Date;
+  ownerId?: string;
   propertyTitle?: string;
   propertyLocation?: string;
 }
