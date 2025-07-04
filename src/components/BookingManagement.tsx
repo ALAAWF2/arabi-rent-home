@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -9,11 +8,12 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { toast } from '../hooks/use-toast';
-import { Calendar, User, MapPin, MessageCircle, AlertTriangle, Wallet } from 'lucide-react';
+import { Calendar, User, MessageCircle, AlertTriangle, Wallet } from 'lucide-react';
 
 interface Booking {
   id: string;
   renterId: string;
+  ownerId: string;
   propertyId: string;
   startDate: Date;
   endDate: Date;
@@ -37,16 +37,11 @@ const BookingManagement: React.FC = () => {
     if (!currentUser) return;
 
     try {
-      const propertiesSnapshot = await getDocs(
-        query(collection(db, 'properties'), where('ownerId', '==', currentUser.uid))
+      const bookingsQuery = query(
+        collection(db, 'bookings'),
+        where('ownerId', '==', currentUser.uid)
       );
-      const propertiesMap = new Map(
-        propertiesSnapshot.docs.map(doc => [doc.id, doc.data()])
-      );
-
-      const bookingsSnapshot = await getDocs(
-        query(collection(db, 'bookings'), where('ownerId', '==', currentUser.uid))
-      );
+      const bookingsSnapshot = await getDocs(bookingsQuery);
 
       const bookingsData = await Promise.all(
         bookingsSnapshot.docs.map(async (bookingDoc) => {
@@ -55,7 +50,9 @@ const BookingManagement: React.FC = () => {
           const renterDoc = await getDoc(doc(db, 'users', bookingData.renterId));
           const renterName = renterDoc.exists() ? renterDoc.data().name : 'غير معروف';
 
-          const propertyData = propertiesMap.get(bookingData.propertyId);
+          const propertyDoc = await getDoc(doc(db, 'properties', bookingData.propertyId));
+          const propertyData = propertyDoc.exists() ? propertyDoc.data() : null;
+          const propertyTitle = propertyData?.title || 'عقار غير معروف';
           const rentalAmount = propertyData?.pricePerMonth || 0;
 
           return {
@@ -65,7 +62,7 @@ const BookingManagement: React.FC = () => {
             endDate: bookingData.endDate.toDate(),
             timestamp: bookingData.timestamp.toDate(),
             renterName,
-            propertyTitle: propertyData?.title || 'عقار غير معروف',
+            propertyTitle,
             rentalAmount
           } as Booking;
         })
@@ -82,8 +79,7 @@ const BookingManagement: React.FC = () => {
 
   const handleBookingAction = async (bookingId: string, action: 'accepted' | 'rejected') => {
     const booking = bookings.find(b => b.id === bookingId);
-    
-    // Check account status before accepting bookings
+
     if (action === 'accepted') {
       const isAccountActive = await checkAccountStatus();
       if (!isAccountActive || userData?.accountStatus === 'suspended') {
@@ -102,16 +98,11 @@ const BookingManagement: React.FC = () => {
       }
     }
 
-    // For rejection or if no commission needed
     try {
-      await updateDoc(doc(db, 'bookings', bookingId), {
-        status: action
-      });
+      await updateDoc(doc(db, 'bookings', bookingId), { status: action });
 
-      setBookings(bookings.map(booking => 
-        booking.id === bookingId 
-          ? { ...booking, status: action }
-          : booking
+      setBookings(bookings.map(b => 
+        b.id === bookingId ? { ...b, status: action } : b
       ));
 
       toast({
@@ -134,7 +125,6 @@ const BookingManagement: React.FC = () => {
     if (!selectedBooking) return;
 
     try {
-      // Deduct commission first
       if (selectedBooking.rentalAmount) {
         await deductCommission(
           selectedBooking.id, 
@@ -143,15 +133,12 @@ const BookingManagement: React.FC = () => {
         );
       }
 
-      // Update booking status
       await updateDoc(doc(db, 'bookings', selectedBooking.id), {
         status: 'accepted'
       });
 
-      setBookings(bookings.map(booking => 
-        booking.id === selectedBooking.id 
-          ? { ...booking, status: 'accepted' }
-          : booking
+      setBookings(bookings.map(b => 
+        b.id === selectedBooking.id ? { ...b, status: 'accepted' } : b
       ));
 
       setShowCommissionDialog(false);
@@ -162,7 +149,6 @@ const BookingManagement: React.FC = () => {
         description: "تم خصم العمولة وقبول الحجز بنجاح",
       });
 
-      // Refresh page to update wallet balance
       setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
       console.error('Error accepting booking:', error);
@@ -243,14 +229,14 @@ const BookingManagement: React.FC = () => {
                         <strong>المستأجر:</strong> {booking.renterName}
                       </span>
                     </div>
-                    
+
                     <div className="flex items-center">
                       <Calendar className="w-4 h-4 ml-2 text-gray-500" />
                       <span className="text-sm">
                         <strong>من:</strong> {formatDate(booking.startDate)}
                       </span>
                     </div>
-                    
+
                     <div className="flex items-center">
                       <Calendar className="w-4 h-4 ml-2 text-gray-500" />
                       <span className="text-sm">
@@ -271,7 +257,7 @@ const BookingManagement: React.FC = () => {
                         </div>
                       </div>
                     )}
-                    
+
                     <div className="text-xs text-gray-500">
                       تم الإرسال: {formatDate(booking.timestamp)}
                     </div>
@@ -303,7 +289,7 @@ const BookingManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Commission Confirmation Dialog */}
+      {/* Dialog for Commission Confirmation */}
       <Dialog open={showCommissionDialog} onOpenChange={setShowCommissionDialog}>
         <DialogContent>
           <DialogHeader>
@@ -390,10 +376,7 @@ const BookingManagement: React.FC = () => {
               )}
 
               <div className="flex space-x-2 space-x-reverse">
-                <Button
-                  onClick={confirmBookingAcceptance}
-                  className="flex-1"
-                >
+                <Button onClick={confirmBookingAcceptance} className="flex-1">
                   تأكيد وقبول الحجز
                 </Button>
                 <Button
