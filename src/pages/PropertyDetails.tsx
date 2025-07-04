@@ -23,7 +23,7 @@ interface Property {
   roomsCount: number;
   furnished: boolean;
   images: string[];
-  timestamp: any;
+  timestamp: Date;
 }
 
 const PropertyDetails: React.FC = () => {

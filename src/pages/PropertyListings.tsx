@@ -19,7 +19,7 @@ interface Property {
   roomsCount: number;
   furnished: boolean;
   images: string[];
-  timestamp: any;
+  timestamp: Date;
 }
 
 const PropertyListings: React.FC = () => {
@@ -38,7 +38,7 @@ const PropertyListings: React.FC = () => {
   const fetchProperties = async () => {
     setLoading(true);
     try {
-      let baseQuery = query(collection(db, 'properties'), orderBy('timestamp', 'desc'));
+      const baseQuery = query(collection(db, 'properties'), orderBy('timestamp', 'desc'));
       const conditions = [];
 
       if (filters.location !== 'all') {

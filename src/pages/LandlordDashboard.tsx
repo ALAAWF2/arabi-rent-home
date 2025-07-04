@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { WalletProvider } from '../contexts/WalletContext';
@@ -30,18 +30,14 @@ const LandlordDashboard: React.FC = () => {
       if (!currentUser) return;
 
       try {
-        const propertiesQuery = query(
-          collection(db, 'properties'),
-          where('ownerId', '==', currentUser.uid)
+        const propertiesSnapshot = await getDocs(
+          query(collection(db, 'properties'), where('ownerId', '==', currentUser.uid))
         );
-        const propertiesSnapshot = await getDocs(propertiesQuery);
-        const totalProperties = propertiesSnapshot.size;
+        const bookingsSnapshot = await getDocs(
+          query(collection(db, 'bookings'), where('ownerId', '==', currentUser.uid))
+        );
 
-        const bookingsQuery = query(
-          collection(db, 'bookings'),
-          where('ownerId', '==', currentUser.uid)
-        );
-        const bookingsSnapshot = await getDocs(bookingsQuery);
+        const totalProperties = propertiesSnapshot.size;
         const totalBookings = bookingsSnapshot.size;
         const pendingBookings = bookingsSnapshot.docs.filter(
           doc => doc.data().status === 'pending'
@@ -97,7 +93,7 @@ const LandlordDashboard: React.FC = () => {
             </Button>
           </div>
 
-          {/* Account Suspension Warning */}
+          {/* تحذير الحساب المعلق */}
           {isAccountSuspended && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
               <div className="flex items-start">
@@ -113,91 +109,91 @@ const LandlordDashboard: React.FC = () => {
             </div>
           )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Building className="w-8 h-8 text-primary ml-3" />
-                <div>
-                  <p className="text-sm font-medium text-gray-600">إجمالي العقارات</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalProperties}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <Building className="w-8 h-8 text-primary ml-3" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">إجمالي العقارات</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.totalProperties}</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Calendar className="w-8 h-8 text-green-600 ml-3" />
-                <div>
-                  <p className="text-sm font-medium text-gray-600">إجمالي الحجوزات</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalBookings}</p>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <Calendar className="w-8 h-8 text-green-600 ml-3" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">إجمالي الحجوزات</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.totalBookings}</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Users className="w-8 h-8 text-orange-600 ml-3" />
-                <div>
-                  <p className="text-sm font-medium text-gray-600">طلبات معلقة</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.pendingBookings}</p>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <Users className="w-8 h-8 text-orange-600 ml-3" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">طلبات معلقة</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.pendingBookings}</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className={isAccountSuspended ? 'border-red-200 bg-red-50' : ''}>
-            <CardContent className="p-6">
-              <div className="flex items-center">
-                <Wallet className="w-8 h-8 text-blue-600 ml-3" />
-                <div>
-                  <p className="text-sm font-medium text-gray-600">رصيد المحفظة</p>
-                  <p className={`text-2xl font-bold ${walletBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    {new Intl.NumberFormat('ar-SY', {
-                      style: 'currency',
-                      currency: 'SYP',
-                      minimumFractionDigits: 0
-                    }).format(walletBalance)}
-                  </p>
+            <Card className={isAccountSuspended ? 'border-red-200 bg-red-50' : ''}>
+              <CardContent className="p-6">
+                <div className="flex items-center">
+                  <Wallet className="w-8 h-8 text-blue-600 ml-3" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">رصيد المحفظة</p>
+                    <p className={`text-2xl font-bold ${walletBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      {new Intl.NumberFormat('ar-SY', {
+                        style: 'currency',
+                        currency: 'SYP',
+                        minimumFractionDigits: 0
+                      }).format(walletBalance)}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          </div>
 
-        <Tabs defaultValue="properties" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="properties">إدارة العقارات</TabsTrigger>
-            <TabsTrigger value="bookings">إدارة الحجوزات</TabsTrigger>
-            <TabsTrigger value="wallet">المحفظة</TabsTrigger>
-          </TabsList>
+          <Tabs defaultValue="properties" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="properties">إدارة العقارات</TabsTrigger>
+              <TabsTrigger value="bookings">إدارة الحجوزات</TabsTrigger>
+              <TabsTrigger value="wallet">المحفظة</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="properties">
-            <PropertyManagement />
-          </TabsContent>
+            <TabsContent value="properties">
+              <PropertyManagement />
+            </TabsContent>
 
-          <TabsContent value="bookings">
-            <BookingManagement />
-          </TabsContent>
+            <TabsContent value="bookings">
+              <BookingManagement />
+            </TabsContent>
 
-          <TabsContent value="wallet">
-            <WalletManagement />
-          </TabsContent>
-        </Tabs>
+            <TabsContent value="wallet">
+              <WalletManagement />
+            </TabsContent>
+          </Tabs>
 
-        {showPropertyForm && (
-          <PropertyForm
-            onClose={() => setShowPropertyForm(false)}
-            onSuccess={() => {
-              setShowPropertyForm(false);
-              window.location.reload();
-            }}
-          />
-        )}
+          {showPropertyForm && (
+            <PropertyForm
+              onClose={() => setShowPropertyForm(false)}
+              onSuccess={() => {
+                setShowPropertyForm(false);
+                window.location.reload();
+              }}
+            />
+          )}
         </div>
       </div>
     </WalletProvider>
