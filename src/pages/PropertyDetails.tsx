@@ -23,7 +23,7 @@ interface Property {
   roomsCount: number;
   furnished: boolean;
   images: string[];
-  timestamp: any;
+  timestamp: Date;
 }
 
 const PropertyDetails: React.FC = () => {
@@ -106,6 +106,7 @@ const PropertyDetails: React.FC = () => {
 
       await addDoc(collection(db, 'bookings'), {
         renterId: currentUser.uid,
+        ownerId: property.ownerId,
         propertyId: id,
         startDate: new Date(bookingData.startDate),
         endDate: new Date(bookingData.endDate),

@@ -30,37 +30,19 @@ const LandlordDashboard: React.FC = () => {
       if (!currentUser) return;
 
       try {
-        const propertiesQuery = query(
-          collection(db, 'properties'),
-          where('ownerId', '==', currentUser.uid)
+        const propertiesSnapshot = await getDocs(
+          query(collection(db, 'properties'), where('ownerId', '==', currentUser.uid))
         );
-        const propertiesSnapshot = await getDocs(propertiesQuery);
-        const propertyIds = propertiesSnapshot.docs.map(doc => doc.id);
-        let totalBookings = 0;
-        let pendingBookings = 0;
-
-        for (let i = 0; i < propertyIds.length; i += 10) {
-          const chunk = propertyIds.slice(i, i + 10);
-          let bookingsQuery;
-          if (chunk.length === 1) {
-            bookingsQuery = query(
-              collection(db, 'bookings'),
-              where('propertyId', '==', chunk[0])
-            );
-          } else {
-            bookingsQuery = query(
-              collection(db, 'bookings'),
-              where('propertyId', 'in', chunk)
-            );
-          }
-          const bookingsSnapshot = await getDocs(bookingsQuery);
-          totalBookings += bookingsSnapshot.size;
-          pendingBookings += bookingsSnapshot.docs.filter(
-            doc => doc.data().status === 'pending'
-          ).length;
-        }
+        const bookingsSnapshot = await getDocs(
+          query(collection(db, 'bookings'), where('ownerId', '==', currentUser.uid))
+        );
 
         const totalProperties = propertiesSnapshot.size;
+        const totalBookings = bookingsSnapshot.size;
+        const pendingBookings = bookingsSnapshot.docs.filter(
+          doc => doc.data().status === 'pending'
+        ).length;
+
         setStats({ totalProperties, totalBookings, pendingBookings });
       } catch (error) {
         console.error('Error fetching stats:', error);

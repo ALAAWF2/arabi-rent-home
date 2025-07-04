@@ -37,72 +37,42 @@ const BookingManagement: React.FC = () => {
     if (!currentUser) return;
 
     try {
-      // First, get all properties owned by current user
-      const propertiesQuery = query(
-        collection(db, 'properties'),
-        where('ownerId', '==', currentUser.uid)
+      const propertiesSnapshot = await getDocs(
+        query(collection(db, 'properties'), where('ownerId', '==', currentUser.uid))
       );
-      const propertiesSnapshot = await getDocs(propertiesQuery);
-      const propertyIds = propertiesSnapshot.docs.map(doc => doc.id);
       const propertiesMap = new Map(
-        propertiesSnapshot.docs.map(doc => [doc.id, doc.data().title])
+        propertiesSnapshot.docs.map(doc => [doc.id, doc.data()])
       );
 
-      if (propertyIds.length === 0) {
-        setLoading(false);
-        return;
-      }
+      const bookingsSnapshot = await getDocs(
+        query(collection(db, 'bookings'), where('ownerId', '==', currentUser.uid))
+      );
 
-      let allBookings: Booking[] = [];
-      for (let i = 0; i < propertyIds.length; i += 10) {
-        const chunk = propertyIds.slice(i, i + 10);
-        let bookingsQuery;
-        if (chunk.length === 1) {
-          bookingsQuery = query(
-            collection(db, 'bookings'),
-            where('propertyId', '==', chunk[0])
-          );
-        } else {
-          bookingsQuery = query(
-            collection(db, 'bookings'),
-            where('propertyId', 'in', chunk)
-          );
-        }
+      const bookingsData = await Promise.all(
+        bookingsSnapshot.docs.map(async (bookingDoc) => {
+          const bookingData = bookingDoc.data();
 
-        const bookingsSnapshot = await getDocs(bookingsQuery);
+          const renterDoc = await getDoc(doc(db, 'users', bookingData.renterId));
+          const renterName = renterDoc.exists() ? renterDoc.data().name : 'غير معروف';
 
-        const bookingsData = await Promise.all(
-          bookingsSnapshot.docs.map(async (bookingDoc) => {
-            const bookingData = bookingDoc.data();
+          const propertyData = propertiesMap.get(bookingData.propertyId);
+          const rentalAmount = propertyData?.pricePerMonth || 0;
 
-            // Get renter name
-            const renterDoc = await getDoc(doc(db, 'users', bookingData.renterId));
-            const renterName = renterDoc.exists() ? renterDoc.data().name : 'غير معروف';
+          return {
+            id: bookingDoc.id,
+            ...bookingData,
+            startDate: bookingData.startDate.toDate(),
+            endDate: bookingData.endDate.toDate(),
+            timestamp: bookingData.timestamp.toDate(),
+            renterName,
+            propertyTitle: propertyData?.title || 'عقار غير معروف',
+            rentalAmount
+          } as Booking;
+        })
+      );
 
-            // Get property rental amount
-            const propertyDoc = await getDoc(doc(db, 'properties', bookingData.propertyId));
-            const propertyData = propertyDoc.exists() ? propertyDoc.data() : null;
-            const rentalAmount = propertyData?.pricePerMonth || 0;
-
-            return {
-              id: bookingDoc.id,
-              ...bookingData,
-              startDate: bookingData.startDate.toDate(),
-              endDate: bookingData.endDate.toDate(),
-              timestamp: bookingData.timestamp.toDate(),
-              renterName,
-              propertyTitle: propertiesMap.get(bookingData.propertyId) || 'عقار غير معروف',
-              rentalAmount
-            } as Booking;
-          })
-        );
-
-        allBookings = allBookings.concat(bookingsData);
-      }
-
-      // Sort by timestamp (newest first)
-      allBookings.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-      setBookings(allBookings);
+      bookingsData.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+      setBookings(bookingsData);
     } catch (error) {
       console.error('Error fetching bookings:', error);
     } finally {
