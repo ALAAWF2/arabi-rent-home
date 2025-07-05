@@ -34,13 +34,26 @@ const BookingManagement: React.FC = () => {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
   const fetchBookings = async () => {
-    if (!currentUser) return;
+    if (!currentUser || !userData) return;
 
     try {
-      const bookingsQuery = query(
-        collection(db, 'bookings'),
-        where('ownerId', '==', currentUser.uid)
-      );
+      let bookingsQuery;
+
+      if (userData.role === 'landlord') {
+        bookingsQuery = query(
+          collection(db, 'bookings'),
+          where('ownerId', '==', currentUser.uid)
+        );
+      } else if (userData.role === 'renter') {
+        bookingsQuery = query(
+          collection(db, 'bookings'),
+          where('renterId', '==', currentUser.uid)
+        );
+      } else {
+        setLoading(false);
+        return;
+      }
+
       const bookingsSnapshot = await getDocs(bookingsQuery);
 
       const bookingsData = await Promise.all(
@@ -76,6 +89,10 @@ const BookingManagement: React.FC = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchBookings();
+  }, [currentUser, userData]);
 
   const handleBookingAction = async (bookingId: string, action: 'accepted' | 'rejected') => {
     const booking = bookings.find(b => b.id === bookingId);
@@ -181,219 +198,123 @@ const BookingManagement: React.FC = () => {
     }).format(date);
   };
 
-  useEffect(() => {
-    fetchBookings();
-  }, [currentUser]);
-
-  if (loading) {
-    return (
-      <div className="text-center py-8">
-        <div className="text-gray-600">جاري التحميل...</div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">طلبات الحجز</h2>
-        <div className="text-sm text-gray-600">
-          إجمالي الطلبات: {bookings.length}
+      {loading ? (
+        <div className="text-center py-8">
+          <div className="text-gray-600">جاري التحميل...</div>
         </div>
-      </div>
-
-      {bookings.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <div className="text-gray-600">
-              لا توجد طلبات حجز حتى الآن
-            </div>
-          </CardContent>
-        </Card>
       ) : (
-        <div className="space-y-4">
-          {bookings.map((booking) => (
-            <Card key={booking.id}>
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">{booking.propertyTitle}</CardTitle>
-                  {getStatusBadge(booking.status)}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center">
-                      <User className="w-4 h-4 ml-2 text-gray-500" />
-                      <span className="text-sm">
-                        <strong>المستأجر:</strong> {booking.renterName}
-                      </span>
-                    </div>
+        <>
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-gray-900">
+              {userData?.role === 'landlord' ? 'طلبات الحجز الواردة' : 'حجوزاتي السابقة'}
+            </h2>
+            <div className="text-sm text-gray-600">
+              عدد الطلبات: {bookings.length}
+            </div>
+          </div>
 
-                    <div className="flex items-center">
-                      <Calendar className="w-4 h-4 ml-2 text-gray-500" />
-                      <span className="text-sm">
-                        <strong>من:</strong> {formatDate(booking.startDate)}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center">
-                      <Calendar className="w-4 h-4 ml-2 text-gray-500" />
-                      <span className="text-sm">
-                        <strong>إلى:</strong> {formatDate(booking.endDate)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    {booking.message && (
-                      <div>
-                        <div className="flex items-start">
-                          <MessageCircle className="w-4 h-4 ml-2 mt-1 text-gray-500" />
-                          <div>
-                            <strong className="text-sm">رسالة المستأجر:</strong>
-                            <p className="text-sm text-gray-600 mt-1">{booking.message}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="text-xs text-gray-500">
-                      تم الإرسال: {formatDate(booking.timestamp)}
-                    </div>
-                  </div>
-                </div>
-
-                {booking.status === 'pending' && (
-                  <div className="flex space-x-2 space-x-reverse mt-4 pt-4 border-t">
-                    <Button
-                      onClick={() => handleBookingAction(booking.id, 'accepted')}
-                      size="sm"
-                      className="flex-1"
-                    >
-                      قبول الطلب
-                    </Button>
-                    <Button
-                      onClick={() => handleBookingAction(booking.id, 'rejected')}
-                      variant="destructive"
-                      size="sm"
-                      className="flex-1"
-                    >
-                      رفض الطلب
-                    </Button>
-                  </div>
-                )}
+          {bookings.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-gray-600">
+                لا توجد طلبات حالياً
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Dialog for Commission Confirmation */}
-      <Dialog open={showCommissionDialog} onOpenChange={setShowCommissionDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center">
-              <Wallet className="w-5 h-5 ml-2" />
-              تأكيد خصم العمولة
-            </DialogTitle>
-          </DialogHeader>
-          {selectedBooking && (
+          ) : (
             <div className="space-y-4">
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <div className="flex items-start">
-                  <AlertTriangle className="w-5 h-5 text-blue-600 ml-2 mt-0.5" />
-                  <div>
-                    <h4 className="font-semibold text-blue-800">تنبيه العمولة</h4>
-                    <p className="text-sm text-blue-700 mt-1">
-                      عند قبول هذا الحجز، سيتم خصم عمولة 2.5% من قيمة الإيجار من محفظتك.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">قيمة الإيجار:</span>
-                  <span className="font-semibold">
-                    {new Intl.NumberFormat('ar-SY', {
-                      style: 'currency',
-                      currency: 'SYP',
-                      minimumFractionDigits: 0
-                    }).format(selectedBooking.rentalAmount || 0)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">العمولة (2.5%):</span>
-                  <span className="font-semibold text-red-600">
-                    -{new Intl.NumberFormat('ar-SY', {
-                      style: 'currency',
-                      currency: 'SYP',
-                      minimumFractionDigits: 0
-                    }).format((selectedBooking.rentalAmount || 0) * 0.025)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">رصيدك الحالي:</span>
-                  <span className={`font-semibold ${(userData?.walletBalance || 0) < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    {new Intl.NumberFormat('ar-SY', {
-                      style: 'currency',
-                      currency: 'SYP',
-                      minimumFractionDigits: 0
-                    }).format(userData?.walletBalance || 0)}
-                  </span>
-                </div>
-                <hr />
-                <div className="flex justify-between">
-                  <span className="font-semibold">الرصيد بعد الخصم:</span>
-                  <span className={`font-bold ${
-                    ((userData?.walletBalance || 0) - (selectedBooking.rentalAmount || 0) * 0.025) < 0 
-                      ? 'text-red-600' 
-                      : 'text-green-600'
-                  }`}>
-                    {new Intl.NumberFormat('ar-SY', {
-                      style: 'currency',
-                      currency: 'SYP',
-                      minimumFractionDigits: 0
-                    }).format((userData?.walletBalance || 0) - (selectedBooking.rentalAmount || 0) * 0.025)}
-                  </span>
-                </div>
-              </div>
-
-              {((userData?.walletBalance || 0) - (selectedBooking.rentalAmount || 0) * 0.025) <= -100 && (
-                <div className="p-4 bg-red-50 rounded-lg">
-                  <div className="flex items-start">
-                    <AlertTriangle className="w-5 h-5 text-red-600 ml-2 mt-0.5" />
-                    <div>
-                      <h4 className="font-semibold text-red-800">تحذير!</h4>
-                      <p className="text-sm text-red-700 mt-1">
-                        قبول هذا الحجز سيؤدي إلى إيقاف حسابك لأن الرصيد سيصل إلى الحد الأدنى (-100 ريال). 
-                        ستحتاج لشحن المحفظة لإعادة تفعيل الحساب.
-                      </p>
+              {bookings.map((booking) => (
+                <Card key={booking.id}>
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">{booking.propertyTitle}</CardTitle>
+                      {getStatusBadge(booking.status)}
                     </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center">
+                          <User className="w-4 h-4 ml-2 text-gray-500" />
+                          <span className="text-sm">
+                            <strong>المستأجر:</strong> {booking.renterName}
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <Calendar className="w-4 h-4 ml-2 text-gray-500" />
+                          <span className="text-sm"><strong>من:</strong> {formatDate(booking.startDate)}</span>
+                        </div>
+                        <div className="flex items-center">
+                          <Calendar className="w-4 h-4 ml-2 text-gray-500" />
+                          <span className="text-sm"><strong>إلى:</strong> {formatDate(booking.endDate)}</span>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        {booking.message && (
+                          <div className="flex items-start">
+                            <MessageCircle className="w-4 h-4 ml-2 mt-1 text-gray-500" />
+                            <div>
+                              <strong className="text-sm">رسالة:</strong>
+                              <p className="text-sm text-gray-600 mt-1">{booking.message}</p>
+                            </div>
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-500">
+                          تم الإرسال: {formatDate(booking.timestamp)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {booking.status === 'pending' && userData?.role === 'landlord' && (
+                      <div className="flex space-x-2 space-x-reverse mt-4 pt-4 border-t">
+                        <Button onClick={() => handleBookingAction(booking.id, 'accepted')} size="sm" className="flex-1">قبول</Button>
+                        <Button onClick={() => handleBookingAction(booking.id, 'rejected')} variant="destructive" size="sm" className="flex-1">رفض</Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <Dialog open={showCommissionDialog} onOpenChange={setShowCommissionDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center">
+                  <Wallet className="w-5 h-5 ml-2" /> تأكيد خصم العمولة
+                </DialogTitle>
+              </DialogHeader>
+              {selectedBooking && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-blue-50 rounded-lg">
+                    <div className="flex items-start">
+                      <AlertTriangle className="w-5 h-5 text-blue-600 ml-2 mt-0.5" />
+                      <div>
+                        <h4 className="font-semibold text-blue-800">تنبيه العمولة</h4>
+                        <p className="text-sm text-blue-700 mt-1">
+                          سيتم خصم 2.5% من قيمة الإيجار عند قبول الحجز.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>قيمة الإيجار:</span>
+                    <span>{selectedBooking.rentalAmount} ل.س</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>العمولة:</span>
+                    <span className="text-red-600">-{selectedBooking.rentalAmount * 0.025} ل.س</span>
+                  </div>
+                  <div className="flex space-x-2 space-x-reverse">
+                    <Button onClick={confirmBookingAcceptance} className="flex-1">تأكيد</Button>
+                    <Button onClick={() => setShowCommissionDialog(false)} variant="outline" className="flex-1">إلغاء</Button>
                   </div>
                 </div>
               )}
-
-              <div className="flex space-x-2 space-x-reverse">
-                <Button onClick={confirmBookingAcceptance} className="flex-1">
-                  تأكيد وقبول الحجز
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowCommissionDialog(false);
-                    setSelectedBooking(null);
-                  }}
-                  className="flex-1"
-                >
-                  إلغاء
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
     </div>
   );
 };
