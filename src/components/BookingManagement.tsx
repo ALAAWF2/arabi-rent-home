@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  updateDoc,
+  getDoc,
+  QueryDocumentSnapshot,
+  DocumentData,
+} from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useWallet } from '../contexts/WalletContext';
@@ -37,27 +47,14 @@ const BookingManagement: React.FC = () => {
     if (!currentUser || !userData) return;
 
     try {
-      let bookingsQuery;
-
-      if (userData.role === 'landlord') {
-        bookingsQuery = query(
-          collection(db, 'bookings'),
-          where('ownerId', '==', currentUser.uid)
-        );
-      } else if (userData.role === 'renter') {
-        bookingsQuery = query(
-          collection(db, 'bookings'),
-          where('renterId', '==', currentUser.uid)
-        );
-      } else {
-        setLoading(false);
-        return;
-      }
-
+      const bookingsQuery = query(
+        collection(db, 'bookings'),
+        where('ownerId', '==', currentUser.uid)
+      );
       const bookingsSnapshot = await getDocs(bookingsQuery);
 
       const bookingsData = await Promise.all(
-        bookingsSnapshot.docs.map(async (bookingDoc) => {
+        bookingDocs.map(async (bookingDoc) => {
           const bookingData = bookingDoc.data();
 
           const renterDoc = await getDoc(doc(db, 'users', bookingData.renterId));
@@ -76,7 +73,7 @@ const BookingManagement: React.FC = () => {
             timestamp: bookingData.timestamp.toDate(),
             renterName,
             propertyTitle,
-            rentalAmount
+            rentalAmount,
           } as Booking;
         })
       );
