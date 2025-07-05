@@ -25,43 +25,35 @@ const LandlordDashboard: React.FC = () => {
   const isAccountSuspended = userData?.accountStatus === 'suspended';
   const walletBalance = userData?.walletBalance || 0;
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      if (!currentUser) return;
+ useEffect(() => {
+  const fetchStats = async () => {
+    if (!currentUser) return;
 
-      try {
-        const propertiesSnapshot = await getDocs(
-          query(collection(db, 'properties'), where('ownerId', '==', currentUser.uid))
-        );
-        const propertyIds = propertiesSnapshot.docs.map(doc => doc.id);
+    try {
+      const propertiesSnapshot = await getDocs(
+        query(collection(db, 'properties'), where('ownerId', '==', currentUser.uid))
+      );
 
-        let totalBookings = 0;
-        let pendingBookings = 0;
+      const totalProperties = propertiesSnapshot.size;
 
-        if (propertyIds.length > 0) {
-          const chunkSize = 10;
-          for (let i = 0; i < propertyIds.length; i += chunkSize) {
-            const chunk = propertyIds.slice(i, i + chunkSize);
-            const bookingsSnapshot = await getDocs(
-              query(collection(db, 'bookings'), where('propertyId', 'in', chunk))
-            );
-            totalBookings += bookingsSnapshot.size;
-            pendingBookings += bookingsSnapshot.docs.filter(
-              doc => doc.data().status === 'pending'
-            ).length;
-          }
-        }
+      const bookingsSnapshot = await getDocs(
+        query(collection(db, 'bookings'), where('ownerId', '==', currentUser.uid))
+      );
 
-        const totalProperties = propertiesSnapshot.size;
+      const totalBookings = bookingsSnapshot.size;
+      const pendingBookings = bookingsSnapshot.docs.filter(
+        doc => doc.data().status === 'pending'
+      ).length;
 
-        setStats({ totalProperties, totalBookings, pendingBookings });
-      } catch (error) {
-        console.error('Error fetching stats:', error);
-      }
-    };
+      setStats({ totalProperties, totalBookings, pendingBookings });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  };
 
-    fetchStats();
-  }, [currentUser]);
+  fetchStats();
+}, [currentUser]);
+
 
   if (userData?.role !== 'owner') {
     return (

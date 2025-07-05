@@ -43,49 +43,49 @@ const BookingManagement: React.FC = () => {
   const [showCommissionDialog, setShowCommissionDialog] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
-  const fetchBookings = async () => {
-    if (!currentUser || !userData) return;
+ const fetchBookings = async () => {
+  if (!currentUser || !userData) return;
 
-    try {
-      const bookingsQuery = query(
-        collection(db, 'bookings'),
-        where('ownerId', '==', currentUser.uid)
-      );
-      const bookingsSnapshot = await getDocs(bookingsQuery);
+  try {
+    const bookingsQuery = query(
+      collection(db, 'bookings'),
+      where('ownerId', '==', currentUser.uid)
+    );
+    const bookingsSnapshot = await getDocs(bookingsQuery);
 
-      const bookingsData = await Promise.all(
-        bookingDocs.map(async (bookingDoc) => {
-          const bookingData = bookingDoc.data();
+    const bookingsData = await Promise.all(
+      bookingsSnapshot.docs.map(async (bookingDoc) => {
+        const bookingData = bookingDoc.data();
 
-          const renterDoc = await getDoc(doc(db, 'users', bookingData.renterId));
-          const renterName = renterDoc.exists() ? renterDoc.data().name : 'غير معروف';
+        const renterDoc = await getDoc(doc(db, 'users', bookingData.renterId));
+        const renterName = renterDoc.exists() ? renterDoc.data().name : 'غير معروف';
 
-          const propertyDoc = await getDoc(doc(db, 'properties', bookingData.propertyId));
-          const propertyData = propertyDoc.exists() ? propertyDoc.data() : null;
-          const propertyTitle = propertyData?.title || 'عقار غير معروف';
-          const rentalAmount = propertyData?.pricePerMonth || 0;
+        const propertyDoc = await getDoc(doc(db, 'properties', bookingData.propertyId));
+        const propertyData = propertyDoc.exists() ? propertyDoc.data() : null;
+        const propertyTitle = propertyData?.title || 'عقار غير معروف';
+        const rentalAmount = propertyData?.pricePerMonth || 0;
 
-          return {
-            id: bookingDoc.id,
-            ...bookingData,
-            startDate: bookingData.startDate.toDate(),
-            endDate: bookingData.endDate.toDate(),
-            timestamp: bookingData.timestamp.toDate(),
-            renterName,
-            propertyTitle,
-            rentalAmount,
-          } as Booking;
-        })
-      );
+        return {
+          id: bookingDoc.id,
+          ...bookingData,
+          startDate: bookingData.startDate.toDate(),
+          endDate: bookingData.endDate.toDate(),
+          timestamp: bookingData.timestamp.toDate(),
+          renterName,
+          propertyTitle,
+          rentalAmount,
+        } as Booking;
+      })
+    );
 
-      bookingsData.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-      setBookings(bookingsData);
-    } catch (error) {
-      console.error('Error fetching bookings:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    bookingsData.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    setBookings(bookingsData);
+  } catch (error) {
+    console.error('Error fetching bookings:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchBookings();
@@ -204,9 +204,9 @@ const BookingManagement: React.FC = () => {
       ) : (
         <>
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">
-              {userData?.role === 'landlord' ? 'طلبات الحجز الواردة' : 'حجوزاتي السابقة'}
-            </h2>
+           <h2 className="text-2xl font-bold text-gray-900">
+  {userData?.role === 'owner' ? 'طلبات الحجز الواردة' : 'حجوزاتي السابقة'}
+</h2>
             <div className="text-sm text-gray-600">
               عدد الطلبات: {bookings.length}
             </div>
@@ -262,12 +262,13 @@ const BookingManagement: React.FC = () => {
                       </div>
                     </div>
 
-                    {booking.status === 'pending' && userData?.role === 'landlord' && (
-                      <div className="flex space-x-2 space-x-reverse mt-4 pt-4 border-t">
-                        <Button onClick={() => handleBookingAction(booking.id, 'accepted')} size="sm" className="flex-1">قبول</Button>
-                        <Button onClick={() => handleBookingAction(booking.id, 'rejected')} variant="destructive" size="sm" className="flex-1">رفض</Button>
-                      </div>
-                    )}
+                 {booking.status === 'pending' && userData?.role === 'owner' && (
+  <div className="flex space-x-2 space-x-reverse mt-4 pt-4 border-t">
+    <Button onClick={() => handleBookingAction(booking.id, 'accepted')} size="sm" className="flex-1">قبول</Button>
+    <Button onClick={() => handleBookingAction(booking.id, 'rejected')} variant="destructive" size="sm" className="flex-1">رفض</Button>
+  </div>
+)}
+
                   </CardContent>
                 </Card>
               ))}
