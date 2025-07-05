@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  updateDoc,
+  getDoc,
+  QueryDocumentSnapshot,
+  DocumentData,
+} from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { useWallet } from '../contexts/WalletContext';
@@ -37,14 +47,32 @@ const BookingManagement: React.FC = () => {
     if (!currentUser) return;
 
     try {
-      const bookingsQuery = query(
-        collection(db, 'bookings'),
-        where('ownerId', '==', currentUser.uid)
+      // First fetch property IDs owned by current user
+      const propertiesSnapshot = await getDocs(
+        query(collection(db, 'properties'), where('ownerId', '==', currentUser.uid))
       );
-      const bookingsSnapshot = await getDocs(bookingsQuery);
+      const propertyIds = propertiesSnapshot.docs.map((doc) => doc.id);
+
+      if (propertyIds.length === 0) {
+        setBookings([]);
+        return;
+      }
+
+      // Firestore allows max 10 IDs for `in` queries. Chunk if needed.
+      const chunkSize = 10;
+      const bookingDocs: QueryDocumentSnapshot<DocumentData>[] = [];
+      for (let i = 0; i < propertyIds.length; i += chunkSize) {
+        const chunk = propertyIds.slice(i, i + chunkSize);
+        const bookingsQuery = query(
+          collection(db, 'bookings'),
+          where('propertyId', 'in', chunk)
+        );
+        const snapshot = await getDocs(bookingsQuery);
+        bookingDocs.push(...snapshot.docs);
+      }
 
       const bookingsData = await Promise.all(
-        bookingsSnapshot.docs.map(async (bookingDoc) => {
+        bookingDocs.map(async (bookingDoc) => {
           const bookingData = bookingDoc.data();
 
           const renterDoc = await getDoc(doc(db, 'users', bookingData.renterId));
@@ -63,7 +91,7 @@ const BookingManagement: React.FC = () => {
             timestamp: bookingData.timestamp.toDate(),
             renterName,
             propertyTitle,
-            rentalAmount
+            rentalAmount,
           } as Booking;
         })
       );
