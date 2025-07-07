@@ -8,6 +8,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { toast } from '../hooks/use-toast';
 import { MapPin, Bed, Trash2, Edit } from 'lucide-react';
+import PropertyForm from './PropertyForm';
 
 interface Property {
   id: string;
@@ -23,6 +24,7 @@ const PropertyManagement: React.FC = () => {
   const { currentUser } = useAuth();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingProperty, setEditingProperty] = useState<Property | null>(null);
 
   const fetchProperties = async () => {
     if (!currentUser) return;
@@ -148,13 +150,7 @@ const PropertyManagement: React.FC = () => {
                       variant="outline"
                       size="sm"
                       className="flex-1"
-                      onClick={() => {
-                        // TODO: Implement edit functionality
-                        toast({
-                          title: "قريباً",
-                          description: "ميزة التعديل ستكون متاحة قريباً",
-                        });
-                      }}
+                      onClick={() => setEditingProperty(property)}
                     >
                       <Edit className="w-4 h-4 ml-1" />
                       تعديل
@@ -172,6 +168,16 @@ const PropertyManagement: React.FC = () => {
             </Card>
           ))}
         </div>
+      )}
+      {editingProperty && (
+        <PropertyForm
+          property={editingProperty}
+          onClose={() => setEditingProperty(null)}
+          onSuccess={() => {
+            setEditingProperty(null);
+            fetchProperties();
+          }}
+        />
       )}
     </div>
   );
