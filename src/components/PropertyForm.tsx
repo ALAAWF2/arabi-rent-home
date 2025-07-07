@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { collection, addDoc } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../lib/firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -14,21 +14,35 @@ import { Label } from './ui/label';
 import { toast } from '../hooks/use-toast';
 import { X, Upload, AlertTriangle } from 'lucide-react';
 
+interface Property {
+  id?: string;
+  ownerId?: string;
+  title: string;
+  description: string;
+  location: string;
+  pricePerDay: number;
+  pricePerMonth: number;
+  roomsCount: number;
+  furnished: boolean;
+  images: string[];
+}
+
 interface PropertyFormProps {
   onClose: () => void;
   onSuccess: () => void;
+  property?: Property;
 }
 
-const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSuccess }) => {
+const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSuccess, property }) => {
   const { currentUser, userData } = useAuth();
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    location: '',
-    pricePerDay: '',
-    pricePerMonth: '',
-    roomsCount: '',
-    furnished: false
+    title: property?.title || '',
+    description: property?.description || '',
+    location: property?.location || '',
+    pricePerDay: property ? String(property.pricePerDay) : '',
+    pricePerMonth: property ? String(property.pricePerMonth) : '',
+    roomsCount: property ? String(property.roomsCount) : '',
+    furnished: property?.furnished || false
   });
   const [images, setImages] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -42,6 +56,20 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSuccess }) => {
     'حمص - الوعر',
     'اللاذقية - الكورنيش'
   ];
+
+  useEffect(() => {
+    if (property) {
+      setFormData({
+        title: property.title,
+        description: property.description,
+        location: property.location,
+        pricePerDay: String(property.pricePerDay),
+        pricePerMonth: String(property.pricePerMonth),
+        roomsCount: String(property.roomsCount),
+        furnished: property.furnished
+      });
+    }
+  }, [property]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -88,35 +116,58 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSuccess }) => {
     setUploading(true);
 
     try {
-      // Upload images
       const imageUrls = images.length > 0 ? await uploadImages() : [];
 
-      // Create property document
-      await addDoc(collection(db, 'properties'), {
-        ownerId: currentUser.uid,
-        title: formData.title,
-        description: formData.description,
-        location: formData.location,
-        pricePerDay: parseInt(formData.pricePerDay),
-        pricePerMonth: parseInt(formData.pricePerMonth),
-        roomsCount: parseInt(formData.roomsCount),
-        furnished: formData.furnished,
-        images: imageUrls,
-        timestamp: new Date()
-      });
+      if (property) {
+        // Update existing property
+        const updatedData: Partial<Property> = {
+          title: formData.title,
+          description: formData.description,
+          location: formData.location,
+          pricePerDay: parseInt(formData.pricePerDay),
+          pricePerMonth: parseInt(formData.pricePerMonth),
+          roomsCount: parseInt(formData.roomsCount),
+          furnished: formData.furnished,
+        };
 
-      toast({
-        title: "تم إضافة العقار بنجاح",
-        description: "العقار متاح الآن للحجز",
-      });
+        if (imageUrls.length > 0) {
+          updatedData.images = imageUrls;
+        }
+
+        await updateDoc(doc(db, 'properties', property.id as string), updatedData);
+
+        toast({
+          title: 'تم التعديل بنجاح',
+          description: 'تم تحديث بيانات العقار',
+        });
+      } else {
+        // Create property document
+        await addDoc(collection(db, 'properties'), {
+          ownerId: currentUser.uid,
+          title: formData.title,
+          description: formData.description,
+          location: formData.location,
+          pricePerDay: parseInt(formData.pricePerDay),
+          pricePerMonth: parseInt(formData.pricePerMonth),
+          roomsCount: parseInt(formData.roomsCount),
+          furnished: formData.furnished,
+          images: imageUrls,
+          timestamp: new Date(),
+        });
+
+        toast({
+          title: 'تم إضافة العقار بنجاح',
+          description: 'العقار متاح الآن للحجز',
+        });
+      }
 
       onSuccess();
     } catch (error) {
-      console.error('Error adding property:', error);
+      console.error('Error saving property:', error);
       toast({
-        title: "خطأ",
-        description: "حدث خطأ في إضافة العقار",
-        variant: "destructive",
+        title: 'خطأ',
+        description: 'حدث خطأ أثناء حفظ العقار',
+        variant: 'destructive',
       });
     } finally {
       setUploading(false);
@@ -127,7 +178,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSuccess }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>إضافة عقار جديد</CardTitle>
+          <CardTitle>{property ? 'تعديل العقار' : 'إضافة عقار جديد'}</CardTitle>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="w-4 h-4" />
           </Button>
@@ -241,7 +292,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({ onClose, onSuccess }) => {
 
             <div className="flex space-x-2 space-x-reverse">
               <Button type="submit" disabled={uploading} className="flex-1">
-                {uploading ? 'جاري الحفظ...' : 'حفظ العقار'}
+                {uploading ? 'جاري الحفظ...' : property ? 'حفظ التعديل' : 'حفظ العقار'}
               </Button>
               <Button type="button" variant="outline" onClick={onClose}>
                 إلغاء

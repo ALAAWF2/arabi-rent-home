@@ -27,6 +27,14 @@ const WalletManagement: React.FC = () => {
   const [rechargeLoading, setRechargeLoading] = useState(false);
   const [showRechargeDialog, setShowRechargeDialog] = useState(false);
 
+  if (userData?.role !== 'owner') {
+    return (
+      <div className="text-center py-8 text-gray-600">
+        هذه الصفحة مخصصة لملاك العقارات فقط
+      </div>
+    );
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('ar-SY', {
       style: 'currency',
